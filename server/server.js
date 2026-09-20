@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import cors from 'cors';
 import healthRoutes from "./routes/healthRoutes.js";
+import documentRoutes from "./routes/documentRoutes.js"
+
 
 dotenv.config();
 
@@ -15,6 +17,7 @@ app.use(express.json());
 
 // Routes 
 app.use("/",healthRoutes);
+app.use("/api/documents",documentRoutes);
 
 connectDB();
 
