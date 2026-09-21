@@ -4,6 +4,7 @@ import connectDB from "./config/db.js";
 import cors from 'cors';
 import healthRoutes from "./routes/healthRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(express.json());
 // Routes 
 app.use("/",healthRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/feedback", feedbackRoutes);
 
 connectDB();
 

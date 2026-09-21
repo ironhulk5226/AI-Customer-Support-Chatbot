@@ -13,4 +13,9 @@ export async function sendMessage(message) {
     return response.data
 }
 
+export async function submitFeedback(messageId, feedback) {
+    const response = await api.post('/api/feedback', { messageId, feedback })
+    return response.data
+}
+
 export default api;

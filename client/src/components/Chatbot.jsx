@@ -1,9 +1,11 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
-import { sendMessage } from '../services/api'
+import { sendMessage, submitFeedback } from '../services/api'
 import SourceEvidence from './SourceEvidence'
 
 const suggestions = ['How can I reset my password?', 'How do I update my account?', 'Where can I find my invoice?', 'How do I contact support?']
+
+const createMessageId = (prefix = 'assistant') => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
 
 const normalizeSource = (source, index = 0) => {
   if (!source || typeof source !== 'object') return null
@@ -26,6 +28,7 @@ const normalizeSources = (sources) => {
 }
 
 const defaultAnswer = {
+  id: createMessageId('assistant'),
   text: <>To reset your password, open your <mark>Account Settings</mark> and select the <mark className="violet-mark">Password Recovery</mark> option. A secure reset link will be sent to your registered email address.</>,
   source: 'Account Help Guide.pdf',
   section: 'Password Reset',
@@ -35,6 +38,7 @@ const defaultAnswer = {
     section: 'Password Reset',
     evidence: '“Password reset instructions are available under Account Settings → Security & Access.”',
   }],
+  feedback: null,
 }
 
 function UserMessage({ text }) {
@@ -53,7 +57,7 @@ function UserMessage({ text }) {
   )
 }
 
-function AssistantMessage({ answer = {}, onFeedback = () => {} }) {
+function AssistantMessage({ answer = {}, onFeedback = () => {}, isSubmitting = false }) {
   const visibleSources = normalizeSources(answer.sources)
   const fallbackSources = []
 
@@ -66,6 +70,7 @@ function AssistantMessage({ answer = {}, onFeedback = () => {} }) {
   }
 
   const sourcesToRender = visibleSources.length > 0 ? visibleSources : fallbackSources
+  const selectedFeedback = answer.feedback || null
 
   return (
     <div className="message-in flex max-w-[92%] items-start gap-3 self-start">
@@ -83,8 +88,24 @@ function AssistantMessage({ answer = {}, onFeedback = () => {} }) {
         <div className="flex items-center justify-between px-1 text-[12px] text-slate-400">
           <div className="flex items-center gap-2">
             <span>Was this helpful?</span>
-            <button className="p-1 transition-transform hover:scale-125 hover:text-indigo-600" onClick={() => onFeedback('Helpful')} aria-label="Helpful response">👍</button>
-            <button className="p-1 transition-transform hover:scale-125 hover:text-indigo-600" onClick={() => onFeedback('Not helpful')} aria-label="Not helpful response">👎</button>
+            <button
+              type="button"
+              className={`rounded-md border px-2 py-1 transition-colors ${selectedFeedback === 'helpful' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'}`}
+              onClick={() => onFeedback(answer.id, 'helpful')}
+              aria-label="Mark response as helpful"
+              disabled={isSubmitting}
+            >
+              👍 {selectedFeedback === 'helpful' ? 'Selected' : 'Helpful'}
+            </button>
+            <button
+              type="button"
+              className={`rounded-md border px-2 py-1 transition-colors ${selectedFeedback === 'not_helpful' ? 'border-rose-500 bg-rose-50 text-rose-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'}`}
+              onClick={() => onFeedback(answer.id, 'not_helpful')}
+              aria-label="Mark response as not helpful"
+              disabled={isSubmitting}
+            >
+              👎 {selectedFeedback === 'not_helpful' ? 'Selected' : 'Not Helpful'}
+            </button>
           </div>
         </div>
       </div>
@@ -100,6 +121,7 @@ export default function Chatbot({ language, onLanguageChange }) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [voiceState, setVoiceState] = useState('normal')
+  const [feedbackInFlight, setFeedbackInFlight] = useState({})
   const streamRef = useRef(null)
 
   useEffect(() => {
@@ -109,6 +131,48 @@ export default function Chatbot({ language, onLanguageChange }) {
   }, [messages, loading])
 
   useEffect(() => () => clearTimeout(window.__supportVoiceTimer), [])
+
+  const handleFeedback = async (messageId, nextFeedback) => {
+    const currentMessage = messages.find((message) => message.type === 'assistant' && message.answer?.id === messageId)
+    const previousFeedback = currentMessage?.answer?.feedback || null
+
+    if (!messageId || !currentMessage || previousFeedback === nextFeedback || feedbackInFlight[messageId]) {
+      return
+    }
+
+    setFeedbackInFlight((current) => ({ ...current, [messageId]: nextFeedback }))
+    setMessages((current) => current.map((message) => {
+      if (message.type !== 'assistant' || message.answer?.id !== messageId) return message
+      return {
+        ...message,
+        answer: {
+          ...message.answer,
+          feedback: nextFeedback,
+        },
+      }
+    }))
+
+    try {
+      await submitFeedback(messageId, nextFeedback)
+    } catch {
+      setMessages((current) => current.map((message) => {
+        if (message.type !== 'assistant' || message.answer?.id !== messageId) return message
+        return {
+          ...message,
+          answer: {
+            ...message.answer,
+            feedback: previousFeedback,
+          },
+        }
+      }))
+    } finally {
+      setFeedbackInFlight((current) => {
+        const next = { ...current }
+        delete next[messageId]
+        return next
+      })
+    }
+  }
 
   const submit = async (value = input) => {
     const question = value.trim()
@@ -137,22 +201,26 @@ export default function Chatbot({ language, onLanguageChange }) {
       setMessages((current) => [...current, {
         type: 'assistant',
         answer: {
+          id: createMessageId('assistant'),
           text: answer,
           source: mergedSources[0]?.document || legacySource || 'Support knowledge base',
           section: mergedSources[0]?.section || response.section || '',
           evidence: mergedSources[0]?.evidence || response.evidence || '',
           sources: mergedSources,
+          feedback: null,
         },
       }])
     } catch {
       setMessages((current) => [...current, {
         type: 'assistant',
         answer: {
+          id: createMessageId('assistant'),
           text: 'Sorry, I could not process your request right now. Please try again.',
           source: 'Support service',
           section: 'Unavailable',
           evidence: 'The support service did not return an answer.',
           sources: [],
+          feedback: null,
         },
       }])
     } finally {
@@ -235,7 +303,12 @@ export default function Chatbot({ language, onLanguageChange }) {
             {messages.map((message, index) => (
               message.type === 'user'
                 ? <UserMessage key={`${message.text}-${index}`} text={message.text} />
-                : <AssistantMessage key={`${message.answer?.text || 'assistant'}-${index}`} answer={message.answer} onFeedback={() => {}} />
+                : <AssistantMessage
+                    key={`${message.answer?.id || message.answer?.text || 'assistant'}-${index}`}
+                    answer={message.answer}
+                    onFeedback={handleFeedback}
+                    isSubmitting={Boolean(message.answer?.id && feedbackInFlight[message.answer.id])}
+                  />
             ))}
 
             {loading && (
