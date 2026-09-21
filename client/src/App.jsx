@@ -5,7 +5,6 @@ import Footer from './components/Footer'
 import Hero from './components/Hero'
 import HowItWorks from './components/HowItWorks'
 import Navbar from './components/Navbar'
-import RecentConversations from './components/RecentConversations'
 import TrustSection from './components/TrustSection'
 
 function App() {
@@ -29,7 +28,6 @@ function App() {
         </section>
         <FeatureShowcase />
         <HowItWorks />
-        <RecentConversations />
         <TrustSection />
       </main>
       <Footer />

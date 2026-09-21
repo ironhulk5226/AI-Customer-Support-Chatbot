@@ -1,7 +1,8 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
-import { sendMessage, submitFeedback } from '../services/api'
+import { getConversations, getConversation, saveConversation, sendMessage, submitFeedback } from '../services/api'
 import SourceEvidence from './SourceEvidence'
+import RecentConversations from './RecentConversations'
 
 const suggestions = ['How can I reset my password?', 'How do I update my account?', 'Where can I find my invoice?', 'How do I contact support?']
 
@@ -25,6 +26,13 @@ const normalizeSource = (source, index = 0) => {
 const normalizeSources = (sources) => {
   if (!Array.isArray(sources)) return []
   return sources.map(normalizeSource).filter(Boolean)
+}
+
+const serializeMessageText = (value) => {
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (Array.isArray(value)) return value.map(serializeMessageText).join('')
+  if (value && typeof value === 'object') return serializeMessageText(value.props?.children)
+  return ''
 }
 
 const defaultAnswer = {
@@ -122,7 +130,65 @@ export default function Chatbot({ language, onLanguageChange }) {
   const [loading, setLoading] = useState(false)
   const [voiceState, setVoiceState] = useState('normal')
   const [feedbackInFlight, setFeedbackInFlight] = useState({})
+  const [conversations, setConversations] = useState([])
+  const [historyError, setHistoryError] = useState('')
+  const [activeConversationId, setActiveConversationId] = useState(null)
   const streamRef = useRef(null)
+
+  const normalizeForStorage = (chatMessages) => {
+    return chatMessages.map((message) => {
+      if (message.type === 'user') {
+        return {
+          role: 'user',
+          content: message.text || '',
+          timestamp: new Date().toISOString(),
+        }
+      }
+
+      return {
+        role: 'assistant',
+        content: serializeMessageText(message.answer?.text),
+        timestamp: new Date().toISOString(),
+        sources: normalizeSources(message.answer?.sources || []),
+        feedback: message.answer?.feedback || null,
+      }
+    })
+  }
+
+  const persistConversation = async (nextMessages) => {
+    const payload = normalizeForStorage(nextMessages)
+    if (!payload.length) return
+
+    try {
+      const response = await saveConversation({
+        conversationId: activeConversationId,
+        messages: payload,
+      })
+
+      if (response?.conversation) {
+        setActiveConversationId(response.conversation._id || activeConversationId)
+      }
+
+      const refreshed = await getConversations()
+      setConversations(refreshed)
+    } catch {
+      setHistoryError('Unable to save your conversation right now.')
+    }
+  }
+
+  const loadConversationHistory = async () => {
+    try {
+      const response = await getConversations()
+      setConversations(response)
+      setHistoryError('')
+    } catch {
+      setHistoryError('Unable to load recent conversations right now.')
+    }
+  }
+
+  useEffect(() => {
+    loadConversationHistory()
+  }, [])
 
   useEffect(() => {
     if (streamRef.current) {
@@ -178,7 +244,8 @@ export default function Chatbot({ language, onLanguageChange }) {
     const question = value.trim()
     if (!question || loading) return
 
-    setMessages((current) => [...current, { type: 'user', text: question }])
+    const nextMessages = [...messages, { type: 'user', text: question }]
+    setMessages(nextMessages)
     setInput('')
     setLoading(true)
 
@@ -198,7 +265,7 @@ export default function Chatbot({ language, onLanguageChange }) {
         })
       }
 
-      setMessages((current) => [...current, {
+      const assistantMessage = {
         type: 'assistant',
         answer: {
           id: createMessageId('assistant'),
@@ -209,9 +276,13 @@ export default function Chatbot({ language, onLanguageChange }) {
           sources: mergedSources,
           feedback: null,
         },
-      }])
+      }
+
+      const updatedMessages = [...nextMessages, assistantMessage]
+      setMessages(updatedMessages)
+      await persistConversation(updatedMessages)
     } catch {
-      setMessages((current) => [...current, {
+      const fallback = {
         type: 'assistant',
         answer: {
           id: createMessageId('assistant'),
@@ -222,9 +293,45 @@ export default function Chatbot({ language, onLanguageChange }) {
           sources: [],
           feedback: null,
         },
-      }])
+      }
+
+      const updatedMessages = [...nextMessages, fallback]
+      setMessages(updatedMessages)
+      await persistConversation(updatedMessages)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadConversation = async (conversationId) => {
+    try {
+      const conversation = await getConversation(conversationId)
+      if (!conversation) return
+
+      setActiveConversationId(conversationId)
+      const loadedMessages = (conversation.messages || []).map((message) => {
+        if (message.role === 'user') {
+          return { type: 'user', text: serializeMessageText(message.content) }
+        }
+
+        return {
+          type: 'assistant',
+          answer: {
+            id: message._id || createMessageId('assistant'),
+            text: serializeMessageText(message.content),
+            source: message.sources?.[0]?.document || message.sources?.[0]?.name || 'Support knowledge base',
+            section: message.sources?.[0]?.section || '',
+            evidence: message.sources?.[0]?.evidence || '',
+            sources: message.sources || [],
+            feedback: message.feedback || null,
+          },
+        }
+      })
+
+      setMessages(loadedMessages)
+      setHistoryError('')
+    } catch {
+      setHistoryError('Unable to load that conversation. Please try another one.')
     }
   }
 
@@ -251,6 +358,25 @@ export default function Chatbot({ language, onLanguageChange }) {
 
       <div className="relative flex overflow-hidden rounded-2xl border border-indigo-100/90 bg-white/95 shadow-2xl shadow-indigo-500/10 backdrop-blur-2xl">
         <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex items-center justify-between border-b border-indigo-100/70 bg-slate-50 px-4 py-2">
+            <button
+              type="button"
+              className="text-xs font-semibold text-indigo-700"
+              onClick={() => {
+                setMessages([{ type: 'user', text: 'How can I reset my password?' }, { type: 'assistant', answer: defaultAnswer }])
+                setActiveConversationId(null)
+              }}
+            >
+              New conversation
+            </button>
+            <button
+              type="button"
+              className="text-xs font-medium text-slate-500 hover:text-slate-700"
+              onClick={loadConversationHistory}
+            >
+              Refresh history
+            </button>
+          </div>
           <div className="flex items-center justify-between border-b border-indigo-100/70 bg-gradient-to-r from-slate-50/90 via-indigo-50/40 to-slate-50/90 px-5 py-3.5">
             <div className="flex items-center gap-3">
               <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-600 via-violet-600 to-cyan-500 text-white shadow-md shadow-indigo-500/25">
@@ -298,6 +424,12 @@ export default function Chatbot({ language, onLanguageChange }) {
               </button>
             </div>
           </div>
+
+          {historyError && (
+            <div className="mx-6 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {historyError}
+            </div>
+          )}
 
           <div className="flex min-h-[380px] max-h-[520px] flex-col gap-6 overflow-y-auto p-6" ref={streamRef}>
             {messages.map((message, index) => (
@@ -369,6 +501,7 @@ export default function Chatbot({ language, onLanguageChange }) {
           </div>
         </div>
       </div>
+      <RecentConversations conversations={conversations} onSelectConversation={loadConversation} error={historyError} />
     </div>
   )
 }
