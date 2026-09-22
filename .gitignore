@@ -18,3 +18,5 @@ build/
 Thumbs.db
 
 server/uploads/
+server/chroma-data/
+notes/
