@@ -8,7 +8,7 @@ import Navbar from './components/Navbar'
 import TrustSection from './components/TrustSection'
 
 function App() {
-  const [language, setLanguage] = useState('English')
+  const [language, setLanguage] = useState('en')
 
   return (
     <div className="app-shell min-h-screen overflow-x-hidden text-slate-800">
@@ -22,15 +22,15 @@ function App() {
       <main className="relative z-10">
         <section className="px-4 pb-16 pt-10">
           <div className="mx-auto max-w-[960px]">
-            <Hero />
+            <Hero language={language} />
             <Chatbot language={language} onLanguageChange={setLanguage} />
           </div>
         </section>
-        <FeatureShowcase />
-        <HowItWorks />
-        <TrustSection />
+        <FeatureShowcase language={language} />
+        <HowItWorks language={language} />
+        <TrustSection language={language} />
       </main>
-      <Footer />
+      <Footer language={language} />
     </div>
   )
 }

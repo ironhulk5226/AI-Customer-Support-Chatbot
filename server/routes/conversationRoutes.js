@@ -22,6 +22,7 @@ const normalizeMessages = (messages = []) => {
   return messages.map((message) => ({
     role: message.role || 'user',
     content: message.content || '',
+    language: ['en', 'hi', 'mr'].includes(message.language) ? message.language : 'en',
     timestamp: message.timestamp || new Date().toISOString(),
     sources: Array.isArray(message.sources) ? message.sources : [],
     feedback: message.feedback || null,

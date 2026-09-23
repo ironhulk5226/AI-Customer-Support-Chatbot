@@ -6,6 +6,7 @@ import healthRoutes from "./routes/healthRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
+import translationRoutes from "./routes/translationRoutes.js";
 
 dotenv.config();
 
@@ -21,6 +22,7 @@ app.use("/",healthRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/translate", translationRoutes);
 
 connectDB();
 

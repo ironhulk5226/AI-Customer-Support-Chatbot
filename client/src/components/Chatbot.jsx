@@ -4,7 +4,44 @@ import { getConversations, getConversation, saveConversation, sendMessage, submi
 import SourceEvidence from './SourceEvidence'
 import RecentConversations from './RecentConversations'
 
-const suggestions = ['How can I reset my password?', 'How do I update my account?', 'Where can I find my invoice?', 'How do I contact support?']
+const suggestionMap = {
+  en: ['How can I reset my password?', 'How do I update my account?', 'Where can I find my invoice?', 'How do I contact support?'],
+  hi: ['मैं अपना पासवर्ड कैसे रीसेट कर सकता हूँ?', 'मैं अपना खाता कैसे अपडेट कर सकता हूँ?', 'मेरा चालान कहां मिलेगा?', 'मैं सहायता से कैसे संपर्क कर सकता हूँ?'],
+  mr: ['मी माझा पासवर्ड कसे रीसेट करू?', 'मी माझे खाते कसे अपडेट करू?', 'माझा चालान मला कुठे सापडेल?', 'मी समर्थनाशी कसे संपर्क करू?'],
+}
+
+const chatbotLabels = {
+  en: {
+    refresh: 'Refresh history',
+    newConversation: 'New conversation',
+    supportAssistant: 'Support Assistant',
+    ready: 'Ready',
+    banner: 'Ask about billing, passwords, or account settings',
+    search: 'Search',
+    placeholder: 'Message SupportAI...',
+    thinking: 'Thinking...',
+  },
+  hi: {
+    refresh: 'इतिहास ताज़ा करें',
+    newConversation: 'नई बातचीत',
+    supportAssistant: 'सपोर्ट असिस्टेंट',
+    ready: 'तैयार',
+    banner: 'बिलिंग, पासवर्ड या अकाउंट सेटिंग्स के बारे में पूछें',
+    search: 'खोजें',
+    placeholder: 'SupportAI को संदेश लिखें...',
+    thinking: 'सोच रहा है...',
+  },
+  mr: {
+    refresh: 'इतिहास रिफ्रेश करा',
+    newConversation: 'नवीन संभाषण',
+    supportAssistant: 'समर्थन सहाय्यक',
+    ready: 'तयार',
+    banner: 'बिलिंग, पासवर्ड किंवा खाते सेटिंग्जबद्दल विचारा',
+    search: 'शोध',
+    placeholder: 'SupportAI वर संदेश लिहा...',
+    thinking: 'विचार करीत आहे...',
+  },
+}
 
 const createMessageId = (prefix = 'assistant') => `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`
 
@@ -49,14 +86,16 @@ const defaultAnswer = {
   feedback: null,
 }
 
-function UserMessage({ text }) {
+function UserMessage({ text, language = 'en' }) {
+  const timeLabel = language === 'hi' ? 'अभी' : language === 'mr' ? 'आता' : 'Just now'
+
   return (
     <div className="message-in flex max-w-[85%] items-start justify-end gap-2.5 self-end">
       <div className="flex flex-col items-end">
         <div className="rounded-2xl rounded-tr-sm bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-600 px-4 py-2.5 text-[14px] font-medium leading-relaxed text-white shadow-md shadow-indigo-500/20">
           {text}
         </div>
-        <span className="mt-1 font-mono text-[11px] text-slate-400">Just now</span>
+        <span className="mt-1 font-mono text-[11px] text-slate-400">{timeLabel}</span>
       </div>
       <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-violet-600 text-xs font-bold text-white ring-2 ring-indigo-200">
         R
@@ -65,7 +104,7 @@ function UserMessage({ text }) {
   )
 }
 
-function AssistantMessage({ answer = {}, onFeedback = () => {}, isSubmitting = false }) {
+function AssistantMessage({ answer = {}, onFeedback = () => {}, isSubmitting = false, language = 'en' }) {
   const visibleSources = normalizeSources(answer.sources)
   const fallbackSources = []
 
@@ -95,7 +134,7 @@ function AssistantMessage({ answer = {}, onFeedback = () => {}, isSubmitting = f
 
         <div className="flex items-center justify-between px-1 text-[12px] text-slate-400">
           <div className="flex items-center gap-2">
-            <span>Was this helpful?</span>
+            <span>{language === 'hi' ? 'क्या यह मददगार था?' : language === 'mr' ? 'हे उपयुक्त होते का?' : 'Was this helpful?'}</span>
             <button
               type="button"
               className={`rounded-md border px-2 py-1 transition-colors ${selectedFeedback === 'helpful' ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-700'}`}
@@ -103,7 +142,7 @@ function AssistantMessage({ answer = {}, onFeedback = () => {}, isSubmitting = f
               aria-label="Mark response as helpful"
               disabled={isSubmitting}
             >
-              👍 {selectedFeedback === 'helpful' ? 'Selected' : 'Helpful'}
+              👍 {selectedFeedback === 'helpful' ? (language === 'hi' ? 'चयनित' : language === 'mr' ? 'निवडले' : 'Selected') : (language === 'hi' ? 'मददगार' : language === 'mr' ? 'उपयोगी' : 'Helpful')}
             </button>
             <button
               type="button"
@@ -112,7 +151,7 @@ function AssistantMessage({ answer = {}, onFeedback = () => {}, isSubmitting = f
               aria-label="Mark response as not helpful"
               disabled={isSubmitting}
             >
-              👎 {selectedFeedback === 'not_helpful' ? 'Selected' : 'Not Helpful'}
+              👎 {selectedFeedback === 'not_helpful' ? (language === 'hi' ? 'चयनित' : language === 'mr' ? 'निवडले' : 'Selected') : (language === 'hi' ? 'मददगार नहीं' : language === 'mr' ? 'उपयोगी नाही' : 'Not Helpful')}
             </button>
           </div>
         </div>
@@ -141,6 +180,7 @@ export default function Chatbot({ language, onLanguageChange }) {
         return {
           role: 'user',
           content: message.text || '',
+          language: message.language || 'en',
           timestamp: new Date().toISOString(),
         }
       }
@@ -148,6 +188,7 @@ export default function Chatbot({ language, onLanguageChange }) {
       return {
         role: 'assistant',
         content: serializeMessageText(message.answer?.text),
+        language: message.answer?.language || 'en',
         timestamp: new Date().toISOString(),
         sources: normalizeSources(message.answer?.sources || []),
         feedback: message.answer?.feedback || null,
@@ -244,13 +285,14 @@ export default function Chatbot({ language, onLanguageChange }) {
     const question = value.trim()
     if (!question || loading) return
 
-    const nextMessages = [...messages, { type: 'user', text: question }]
+    const normalizedLanguage = ['en', 'hi', 'mr'].includes(language) ? language : 'en'
+    const nextMessages = [...messages, { type: 'user', text: question, language: normalizedLanguage }]
     setMessages(nextMessages)
     setInput('')
     setLoading(true)
 
     try {
-      const response = await sendMessage(question)
+      const response = await sendMessage(question, normalizedLanguage)
       const answer = response.answer || response.text
       if (!answer) throw new Error('Empty chat response')
 
@@ -270,6 +312,7 @@ export default function Chatbot({ language, onLanguageChange }) {
         answer: {
           id: createMessageId('assistant'),
           text: answer,
+          language: normalizedLanguage,
           source: mergedSources[0]?.document || legacySource || 'Support knowledge base',
           section: mergedSources[0]?.section || response.section || '',
           evidence: mergedSources[0]?.evidence || response.evidence || '',
@@ -286,7 +329,12 @@ export default function Chatbot({ language, onLanguageChange }) {
         type: 'assistant',
         answer: {
           id: createMessageId('assistant'),
-          text: 'Sorry, I could not process your request right now. Please try again.',
+          text: {
+            en: 'Sorry, I could not process your request right now. Please try again.',
+            hi: 'क्षमा करें, मैं अभी आपके अनुरोध को संसाधित नहीं कर सका। कृपया पुनः प्रयास करें।',
+            mr: 'क्षमस्व, मी सध्या तुमची विनंती पूर्ण करू शकलो नाही. कृपया पुन्हा प्रयत्न करा.',
+          }[normalizedLanguage] || 'Sorry, I could not process your request right now. Please try again.',
+          language: normalizedLanguage,
           source: 'Support service',
           section: 'Unavailable',
           evidence: 'The support service did not return an answer.',
@@ -311,7 +359,7 @@ export default function Chatbot({ language, onLanguageChange }) {
       setActiveConversationId(conversationId)
       const loadedMessages = (conversation.messages || []).map((message) => {
         if (message.role === 'user') {
-          return { type: 'user', text: serializeMessageText(message.content) }
+          return { type: 'user', text: serializeMessageText(message.content), language: message.language || 'en' }
         }
 
         return {
@@ -319,6 +367,7 @@ export default function Chatbot({ language, onLanguageChange }) {
           answer: {
             id: message._id || createMessageId('assistant'),
             text: serializeMessageText(message.content),
+            language: message.language || 'en',
             source: message.sources?.[0]?.document || message.sources?.[0]?.name || 'Support knowledge base',
             section: message.sources?.[0]?.section || '',
             evidence: message.sources?.[0]?.evidence || '',
@@ -328,6 +377,11 @@ export default function Chatbot({ language, onLanguageChange }) {
         }
       })
 
+      const detectedLanguage = loadedMessages.find((message) => message.type === 'user')?.language
+        || loadedMessages.find((message) => message.type === 'assistant')?.answer?.language
+        || 'en'
+
+      onLanguageChange(detectedLanguage)
       setMessages(loadedMessages)
       setHistoryError('')
     } catch {
@@ -352,6 +406,9 @@ export default function Chatbot({ language, onLanguageChange }) {
     }, 1300)
   }
 
+  const labels = chatbotLabels[language] || chatbotLabels.en
+  const suggestions = suggestionMap[language] || suggestionMap.en
+
   return (
     <div className="relative group">
       <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-500/20 via-violet-500/20 to-cyan-500/20 blur-xl transition-opacity group-hover:opacity-100" />
@@ -367,14 +424,14 @@ export default function Chatbot({ language, onLanguageChange }) {
                 setActiveConversationId(null)
               }}
             >
-              New conversation
+              {labels.newConversation}
             </button>
             <button
               type="button"
               className="text-xs font-medium text-slate-500 hover:text-slate-700"
               onClick={loadConversationHistory}
             >
-              Refresh history
+              {labels.refresh}
             </button>
           </div>
           <div className="flex items-center justify-between border-b border-indigo-100/70 bg-gradient-to-r from-slate-50/90 via-indigo-50/40 to-slate-50/90 px-5 py-3.5">
@@ -388,26 +445,19 @@ export default function Chatbot({ language, onLanguageChange }) {
                 <div className="flex items-center gap-2">
                   <strong className="text-[14px] text-slate-900">SupportAI</strong>
                   <span className="text-indigo-300">•</span>
-                  <span className="text-[13px] font-medium text-slate-600">Support Assistant</span>
+                  <span className="text-[13px] font-medium text-slate-600">{labels.supportAssistant}</span>
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">Ready</span>
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">{labels.ready}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <select aria-label="Chat language" className="rounded-lg border border-indigo-100 bg-white px-2.5 py-1.5 text-[12px] font-medium text-slate-700 outline-none" value={language} onChange={(event) => onLanguageChange(event.target.value)}>
-                <option>English</option>
-                <option>Hindi</option>
-                <option>Marathi</option>
-              </select>
-              <button className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50/60 hover:text-slate-700" aria-label="More options">
-                <Icon name="more" size={18} />
-              </button>
-            </div>
+            <button className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50/60 hover:text-slate-700" aria-label="More options">
+              <Icon name="more" size={18} />
+            </button>
           </div>
 
           <div className="bg-gradient-to-b from-indigo-50/20 to-transparent px-6 pb-2.5 pt-4">
@@ -416,11 +466,11 @@ export default function Chatbot({ language, onLanguageChange }) {
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white">
                   <Icon name="spark" size={14} />
                 </span>
-                <span>Ask about billing, passwords, or account settings</span>
+                <span>{labels.banner}</span>
               </div>
               <button type="button" className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700">
                 <Icon name="search" size={12} />
-                Search
+                {labels.search}
               </button>
             </div>
           </div>
@@ -434,12 +484,13 @@ export default function Chatbot({ language, onLanguageChange }) {
           <div className="flex min-h-[380px] max-h-[520px] flex-col gap-6 overflow-y-auto p-6" ref={streamRef}>
             {messages.map((message, index) => (
               message.type === 'user'
-                ? <UserMessage key={`${message.text}-${index}`} text={message.text} />
+                ? <UserMessage key={`${message.text}-${index}`} text={message.text} language={language} />
                 : <AssistantMessage
                     key={`${message.answer?.id || message.answer?.text || 'assistant'}-${index}`}
                     answer={message.answer}
                     onFeedback={handleFeedback}
                     isSubmitting={Boolean(message.answer?.id && feedbackInFlight[message.answer.id])}
+                    language={language}
                   />
             ))}
 
@@ -450,7 +501,7 @@ export default function Chatbot({ language, onLanguageChange }) {
                 </div>
 
                 <div className="rounded-2xl rounded-tl-sm border border-indigo-100/70 bg-slate-50/90 p-4 text-[14px] text-slate-600 shadow-sm">
-                  Thinking...
+                  {labels.thinking}
                 </div>
               </div>
             )}
@@ -470,7 +521,7 @@ export default function Chatbot({ language, onLanguageChange }) {
                     submit()
                   }
                 }}
-                placeholder="Message SupportAI..."
+                placeholder={labels.placeholder}
                 className="flex-1 border-0 bg-transparent px-2 py-2 text-[14px] text-slate-700 outline-none placeholder:text-slate-400"
                 aria-label="Type your message"
               />
@@ -501,7 +552,7 @@ export default function Chatbot({ language, onLanguageChange }) {
           </div>
         </div>
       </div>
-      <RecentConversations conversations={conversations} onSelectConversation={loadConversation} error={historyError} />
+      <RecentConversations conversations={conversations} onSelectConversation={loadConversation} error={historyError} language={language} />
     </div>
   )
 }
