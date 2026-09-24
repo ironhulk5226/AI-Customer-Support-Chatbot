@@ -4,21 +4,18 @@ import { processDocument } from "../services/documentProcessingService.js";
 import { generateEmbedding } from "../services/embeddingService.js";
 import {
   addDocumentsToVectorStore,
-  deleteDocumentsFromVectorStore
+  deleteDocumentsFromVectorStore,
 } from "../services/vectorStoreService.js";
 
 export const uploadDocument = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
-        message: "No document uploaded."
+        message: "No document uploaded.",
       });
     }
 
-    const extension = req.file.originalname
-      .split(".")
-      .pop()
-      .toLowerCase();
+    const extension = req.file.originalname.split(".").pop().toLowerCase();
 
     const document = await Document.create({
       name: req.file.originalname,
@@ -26,15 +23,13 @@ export const uploadDocument = async (req, res) => {
       fileType: extension,
       fileSize: req.file.size,
       filePath: req.file.path,
-      status: "processing"
+      status: "processing",
+      uploadedBy: req.user.userId,
     });
 
     try {
       // Step 1: Extract, clean and split document
-      const processedData = await processDocument(
-        req.file.path,
-        extension
-      );
+      const processedData = await processDocument(req.file.path, extension);
 
       // Step 2: Generate embeddings for every chunk
       const embeddings = [];
@@ -46,25 +41,23 @@ export const uploadDocument = async (req, res) => {
 
       // Step 3: Generate unique ChromaDB IDs
       const chunkIds = processedData.chunks.map(
-        (_, index) => `${document._id}-chunk-${index}`
+        (_, index) => `${document._id}-chunk-${index}`,
       );
 
       // Step 4: Create metadata for every chunk
-      const metadatas = processedData.chunks.map(
-        (_, index) => ({
-          documentId: document._id.toString(),
-          documentName: document.originalFileName,
-          chunkIndex: index,
-          fileType: document.fileType
-        })
-      );
+      const metadatas = processedData.chunks.map((_, index) => ({
+        documentId: document._id.toString(),
+        documentName: document.originalFileName,
+        chunkIndex: index,
+        fileType: document.fileType,
+      }));
 
       // Step 5: Store chunks in ChromaDB
       await addDocumentsToVectorStore({
         ids: chunkIds,
         documents: processedData.chunks,
         embeddings,
-        metadatas
+        metadatas,
       });
 
       // Step 6: Update MongoDB document status
@@ -76,8 +69,7 @@ export const uploadDocument = async (req, res) => {
 
       // Step 7: Send successful response
       res.status(201).json({
-        message:
-          "Document uploaded, processed, and indexed successfully.",
+        message: "Document uploaded, processed, and indexed successfully.",
 
         document: {
           id: document._id,
@@ -86,8 +78,8 @@ export const uploadDocument = async (req, res) => {
           fileSize: document.fileSize,
           status: document.status,
           processedAt: document.processedAt,
-          chunkCount: processedData.chunks.length
-        }
+          chunkCount: processedData.chunks.length,
+        },
       });
     } catch (processingError) {
       document.status = "failed";
@@ -96,79 +88,64 @@ export const uploadDocument = async (req, res) => {
       await document.save();
 
       res.status(500).json({
-        message:
-          "Document uploaded but processing/indexing failed.",
-        documentId: document._id
+        message: "Document uploaded but processing/indexing failed.",
+        documentId: document._id,
       });
     }
   } catch (error) {
-    console.error(
-      "Document upload error:",
-      error.message
-    );
+    console.error("Document upload error:", error.message);
 
     res.status(500).json({
-      message: "Failed to upload document."
+      message: "Failed to upload document.",
     });
   }
 };
 
 export const getDocuments = async (req, res) => {
   try {
-    const documents = await Document.find()
-      .sort({ createdAt: -1 });
+    const documents = await Document.find().sort({ createdAt: -1 });
 
     res.status(200).json({
-      documents
+      documents,
     });
   } catch (error) {
-    console.error(
-      "Get Documents Error:",
-      error.message
-    );
+    console.error("Get Documents Error:", error.message);
 
     res.status(500).json({
-      message: "Failed to fetch documents."
+      message: "Failed to fetch documents.",
     });
   }
 };
 
 export const getDocumentById = async (req, res) => {
   try {
-    const document = await Document.findById(
-      req.params.id
-    );
+    const document = await Document.findById(req.params.id);
 
     if (!document) {
       return res.status(404).json({
-        message: "Document not found."
+        message: "Document not found.",
       });
     }
 
     res.status(200).json({
-      document
+      document,
     });
   } catch (error) {
-    console.error(
-      "Get Document Error:",
-      error.message
-    );
+    console.error("Get Document Error:", error.message);
 
     res.status(500).json({
-      message: "Failed to fetch document."
+      message: "Failed to fetch document.",
     });
   }
 };
 
 export const deleteDocument = async (req, res) => {
   try {
-    const document = await Document.findById(
-      req.params.id
-    );
+    const document = await Document.findById(req.params.id);
 
     if (!document) {
       return res.status(404).json({
-        message: "Document not found."
+        message: "Document not found.",
       });
     }
 
@@ -176,33 +153,23 @@ export const deleteDocument = async (req, res) => {
     try {
       await fs.unlink(document.filePath);
     } catch (fileError) {
-      console.warn(
-        "File could not be deleted:",
-        fileError.message
-      );
+      console.warn("File could not be deleted:", fileError.message);
     }
 
     // Step 2: Delete document vectors from ChromaDB
-    await deleteDocumentsFromVectorStore(
-      document._id.toString()
-    );
+    await deleteDocumentsFromVectorStore(document._id.toString());
 
     // Step 3: Delete document from MongoDB
-    await Document.findByIdAndDelete(
-      req.params.id
-    );
+    await Document.findByIdAndDelete(req.params.id);
 
     res.status(200).json({
-      message: "Document deleted successfully."
+      message: "Document deleted successfully.",
     });
   } catch (error) {
-    console.error(
-      "Delete document error:",
-      error.message
-    );
+    console.error("Delete document error:", error.message);
 
     res.status(500).json({
-      message: "Failed to delete document."
+      message: "Failed to delete document.",
     });
   }
 };
