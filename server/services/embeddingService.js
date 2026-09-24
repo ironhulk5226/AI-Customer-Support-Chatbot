@@ -17,7 +17,7 @@ export const generateEmbedding = async(text) => {
     } catch (error) {
         console.error("Embedding generation failed", error.message);
 
-        throw new error("failed to generate document embedding");
+        throw new Error("Failed to generate document embedding.");
     }
 
 

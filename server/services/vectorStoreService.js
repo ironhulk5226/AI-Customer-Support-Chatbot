@@ -111,32 +111,3 @@ export const getVectorStoreStats = async()=>{
         
     }
 }
-
-export const deleteTestVectors = async () => {
-    try {
-        const collection = await getCollection();
-
-        await collection.delete({
-            ids: [
-                "test-doc-1",
-                "test-doc-2",
-                "test-doc-3",
-                "test-doc-4"
-            ]
-        });
-
-        return {
-            success: true,
-            deletedCount: 4
-        };
-    } catch (error) {
-        console.error(
-            "Failed to delete test vectors:",
-            error.message
-        );
-
-        throw new Error(
-            "Failed to delete test vectors."
-        );
-    }
-};

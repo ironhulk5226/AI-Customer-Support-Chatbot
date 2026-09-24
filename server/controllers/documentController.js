@@ -70,7 +70,6 @@ export const uploadDocument = async (req, res) => {
       // Step 7: Send successful response
       res.status(201).json({
         message: "Document uploaded, processed, and indexed successfully.",
-
         document: {
           id: document._id,
           name: document.name,
@@ -82,12 +81,27 @@ export const uploadDocument = async (req, res) => {
         },
       });
     } catch (processingError) {
+      console.error(
+        "Document processing/indexing failed:",
+        processingError.message,
+      );
+
       document.status = "failed";
       document.processingError = processingError.message;
 
       await document.save();
 
-      res.status(500).json({
+      // Remove the physical file because processing failed
+      try {
+        await fs.unlink(req.file.path);
+      } catch (fileError) {
+        console.error(
+          "Failed to delete uploaded file:",
+          fileError.message,
+        );
+      }
+
+      return res.status(500).json({
         message: "Document uploaded but processing/indexing failed.",
         documentId: document._id,
       });
@@ -95,12 +109,11 @@ export const uploadDocument = async (req, res) => {
   } catch (error) {
     console.error("Document upload error:", error.message);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Failed to upload document.",
     });
   }
 };
-
 export const getDocuments = async (req, res) => {
   try {
     const documents = await Document.find().sort({ createdAt: -1 });
