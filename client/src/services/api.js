@@ -13,6 +13,17 @@ export async function sendMessage(message, language = 'en') {
     return response.data
 }
 
+export async function transcribeAudio(audioBlob) {
+    const response = await api.post('/api/speech', audioBlob, {
+        headers: {
+            'Content-Type': audioBlob.type || 'audio/webm',
+        },
+        timeout: 120000,
+        transformRequest: [(data) => data],
+    })
+    return response.data
+}
+
 export async function translateTexts(texts, target = 'en') {
     const translations = []
     for (let index = 0; index < texts.length; index += 100) {

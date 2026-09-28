@@ -1,6 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import Icon from './Icon'
-import { getConversations, getConversation, saveConversation, sendMessage, submitFeedback } from '../services/api'
+import { getConversations, getConversation, saveConversation, sendMessage, submitFeedback, transcribeAudio } from '../services/api'
 import SourceEvidence from './SourceEvidence'
 import RecentConversations from './RecentConversations'
 
@@ -20,6 +20,10 @@ const chatbotLabels = {
     search: 'Search',
     placeholder: 'Message SupportAI...',
     thinking: 'Thinking...',
+    listening: 'Listening...',
+    transcribing: 'Transcribing locally...',
+    transcribed: 'Text ready to review',
+    voiceError: 'Voice input could not be transcribed.',
   },
   hi: {
     refresh: 'इतिहास ताज़ा करें',
@@ -30,6 +34,10 @@ const chatbotLabels = {
     search: 'खोजें',
     placeholder: 'SupportAI को संदेश लिखें...',
     thinking: 'सोच रहा है...',
+    listening: 'सुन रहा है...',
+    transcribing: 'स्थानीय रूप से लिप्यंतरण हो रहा है...',
+    transcribed: 'टेक्स्ट समीक्षा के लिए तैयार है',
+    voiceError: 'वॉयस इनपुट का लिप्यंतरण नहीं हो सका।',
   },
   mr: {
     refresh: 'इतिहास रिफ्रेश करा',
@@ -40,6 +48,10 @@ const chatbotLabels = {
     search: 'शोध',
     placeholder: 'SupportAI वर संदेश लिहा...',
     thinking: 'विचार करीत आहे...',
+    listening: 'ऐकत आहे...',
+    transcribing: 'स्थानिक लिप्यंतरण सुरू आहे...',
+    transcribed: 'टेक्स्ट तपासण्यासाठी तयार आहे',
+    voiceError: 'व्हॉइस इनपुटचे लिप्यंतरण होऊ शकले नाही.',
   },
 }
 
@@ -169,10 +181,14 @@ export default function Chatbot({ language, onLanguageChange }) {
   const [loading, setLoading] = useState(false)
   const [voiceState, setVoiceState] = useState('normal')
   const [feedbackInFlight, setFeedbackInFlight] = useState({})
+  const [detectedVoiceLanguage, setDetectedVoiceLanguage] = useState('')
   const [conversations, setConversations] = useState([])
   const [historyError, setHistoryError] = useState('')
   const [activeConversationId, setActiveConversationId] = useState(null)
   const streamRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const mediaStreamRef = useRef(null)
+  const audioChunksRef = useRef([])
 
   const normalizeForStorage = (chatMessages) => {
     return chatMessages.map((message) => {
@@ -237,7 +253,10 @@ export default function Chatbot({ language, onLanguageChange }) {
     }
   }, [messages, loading])
 
-  useEffect(() => () => clearTimeout(window.__supportVoiceTimer), [])
+  useEffect(() => () => {
+    mediaRecorderRef.current?.stop()
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop())
+  }, [])
 
   const handleFeedback = async (messageId, nextFeedback) => {
     const currentMessage = messages.find((message) => message.type === 'assistant' && message.answer?.id === messageId)
@@ -389,21 +408,65 @@ export default function Chatbot({ language, onLanguageChange }) {
     }
   }
 
-  const toggleVoice = () => {
-    if (voiceState !== 'normal') {
-      clearTimeout(window.__supportVoiceTimer)
-      setVoiceState('normal')
+  const transcribeRecording = async (audioBlob) => {
+    setVoiceState('processing')
+
+    try {
+      const result = await transcribeAudio(audioBlob)
+      const recognizedText = typeof result.text === 'string' ? result.text.trim() : ''
+
+      if (!recognizedText) throw new Error('No speech was recognized')
+
+      setInput(recognizedText)
+      setDetectedVoiceLanguage(result.language || '')
+      setVoiceState('transcribed')
+
+      if (['en', 'hi', 'mr'].includes(result.language)) {
+        onLanguageChange(result.language)
+      }
+    } catch {
+      setVoiceState('error')
+    }
+  }
+
+  const toggleVoice = async () => {
+    if (voiceState === 'recording') {
+      mediaRecorderRef.current?.stop()
       return
     }
 
-    setVoiceState('recording')
-    window.__supportVoiceTimer = setTimeout(() => {
-      setVoiceState('processing')
-      window.__supportVoiceTimer = setTimeout(() => {
-        setInput('Where can I find my invoice?')
-        setVoiceState('transcribed')
-      }, 900)
-    }, 1300)
+    if (voiceState === 'processing') return
+
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setVoiceState('error')
+      return
+    }
+
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(mediaStream)
+      audioChunksRef.current = []
+      mediaStreamRef.current = mediaStream
+      mediaRecorderRef.current = mediaRecorder
+
+      mediaRecorder.addEventListener('dataavailable', (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data)
+      })
+      mediaRecorder.addEventListener('stop', () => {
+        mediaStream.getTracks().forEach((track) => track.stop())
+        mediaStreamRef.current = null
+        mediaRecorderRef.current = null
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorder.mimeType || 'audio/webm' })
+        audioChunksRef.current = []
+        transcribeRecording(audioBlob)
+      }, { once: true })
+
+      mediaRecorder.start()
+      setDetectedVoiceLanguage('')
+      setVoiceState('recording')
+    } catch {
+      setVoiceState('error')
+    }
   }
 
   const labels = chatbotLabels[language] || chatbotLabels.en
@@ -509,7 +572,7 @@ export default function Chatbot({ language, onLanguageChange }) {
 
           <div className="border-t border-indigo-100/70 bg-gradient-to-r from-white to-indigo-50/40 p-4">
             <div className="flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white p-2 shadow-sm">
-              <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100" aria-label="Voice input" onClick={toggleVoice}>
+              <button type="button" className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60" aria-label={voiceState === 'recording' ? 'Stop voice input' : 'Voice input'} onClick={toggleVoice} disabled={voiceState === 'processing'}>
                 <Icon name={voiceState === 'recording' ? 'voice' : 'mic'} size={18} />
               </button>
 
@@ -536,6 +599,15 @@ export default function Chatbot({ language, onLanguageChange }) {
                 <Icon name="arrow" size={16} />
               </button>
             </div>
+
+            {voiceState !== 'normal' && (
+              <p className="mt-2 px-1 text-[11px] text-slate-500" aria-live="polite">
+                {voiceState === 'recording' && labels.listening}
+                {voiceState === 'processing' && labels.transcribing}
+                {voiceState === 'transcribed' && `${labels.transcribed}${detectedVoiceLanguage ? ` (${detectedVoiceLanguage})` : ''}`}
+                {voiceState === 'error' && labels.voiceError}
+              </p>
+            )}
 
             <div className="mt-3 flex flex-wrap gap-2">
               {suggestions.map((suggestion) => (
