@@ -31,6 +31,11 @@ const knowledgeGapSchema = new mongoose.Schema({
     enum: ['candidate', 'reviewed', 'resolved'],
     default: 'candidate',
   },
+  recurrenceStatus: {
+    type: String,
+    enum: ['emerging', 'recurring'],
+    default: 'emerging',
+  },
   firstDetectedAt: {
     type: Date,
     default: Date.now,

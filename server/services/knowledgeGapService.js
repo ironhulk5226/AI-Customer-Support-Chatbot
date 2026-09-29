@@ -3,6 +3,19 @@ import KnowledgeGap from '../models/KnowledgeGap.js';
 import { findSimilarKnowledgeGap } from './knowledgeGapGroupingService.js';
 
 const memoryKnowledgeGaps = [];
+const defaultRecurrenceThreshold = 3;
+
+export const getRecurrenceThreshold = () => {
+  const configuredThreshold = Number.parseInt(process.env.KNOWLEDGE_GAP_RECURRENCE_THRESHOLD, 10);
+  return Number.isInteger(configuredThreshold) && configuredThreshold > 0
+    ? configuredThreshold
+    : defaultRecurrenceThreshold;
+};
+
+const updateRecurrenceStatus = (gap) => {
+  gap.recurrenceStatus = gap.occurrenceCount >= getRecurrenceThreshold() ? 'recurring' : 'emerging';
+  return gap;
+};
 
 const normalizeGapPayload = (payload = {}) => ({
   originalQuestion: typeof payload.originalQuestion === 'string' ? payload.originalQuestion.trim() : '',
@@ -18,7 +31,7 @@ const recordInMemory = ({ originalQuestion, normalizedQuestion, language }) => {
     existing.occurrenceCount += 1;
     existing.lastDetectedAt = now;
     existing.questionHistory.push(originalQuestion);
-    return existing;
+    return updateRecurrenceStatus(existing);
   }
 
   const gap = {
@@ -28,13 +41,14 @@ const recordInMemory = ({ originalQuestion, normalizedQuestion, language }) => {
     language,
     occurrenceCount: 1,
     status: 'candidate',
+    recurrenceStatus: 'emerging',
     firstDetectedAt: now,
     lastDetectedAt: now,
     questionHistory: [originalQuestion],
   };
 
   memoryKnowledgeGaps.push(gap);
-  return gap;
+  return updateRecurrenceStatus(gap);
 };
 
 export const recordKnowledgeGap = async (payload) => {
@@ -54,6 +68,7 @@ export const recordKnowledgeGap = async (payload) => {
       ...normalized,
       occurrenceCount: 1,
       status: 'candidate',
+      recurrenceStatus: 'emerging',
       questionHistory: [normalized.originalQuestion],
     });
   }
@@ -61,6 +76,7 @@ export const recordKnowledgeGap = async (payload) => {
   existing.occurrenceCount += 1;
   existing.lastDetectedAt = new Date();
   existing.questionHistory = [...(existing.questionHistory || []), normalized.originalQuestion];
+  updateRecurrenceStatus(existing);
   await existing.save();
   return existing;
 };
@@ -69,9 +85,19 @@ export const listKnowledgeGaps = async ({ status } = {}) => {
   if (mongoose.connection.readyState !== 1) {
     return memoryKnowledgeGaps
       .filter((gap) => !status || gap.status === status)
+      .map(updateRecurrenceStatus)
       .sort((a, b) => new Date(b.lastDetectedAt) - new Date(a.lastDetectedAt));
   }
 
   const filter = ['candidate', 'reviewed', 'resolved'].includes(status) ? { status } : {};
-  return KnowledgeGap.find(filter).sort({ lastDetectedAt: -1 }).limit(100);
+  const gaps = await KnowledgeGap.find(filter).sort({ lastDetectedAt: -1 }).limit(100);
+  return Promise.all(gaps.map(async (gap) => {
+    const recurrenceStatus = gap.occurrenceCount >= getRecurrenceThreshold() ? 'recurring' : 'emerging';
+    if (gap.recurrenceStatus !== recurrenceStatus) {
+      gap.recurrenceStatus = recurrenceStatus;
+      await gap.save();
+    }
+
+    return gap.toObject();
+  }));
 };

@@ -34,6 +34,18 @@ const priorityClasses = {
   resolved: 'bg-emerald-50 text-emerald-700',
 }
 
+const recurrenceClasses = {
+  emerging: 'bg-slate-100 text-slate-600',
+  recurring: 'bg-rose-50 text-rose-700',
+}
+
+const getRecurrenceStatus = (gap) => gap.occurrenceCount >= 3 ? 'recurring' : (gap.recurrenceStatus || 'emerging')
+
+const formatDetectedDate = (value) => {
+  if (!value) return 'Unknown date'
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value))
+}
+
 function PanelHeader({ eyebrow, title, action }) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
@@ -123,9 +135,13 @@ export default function AdminDashboard() {
               <div key={gap._id || gap.normalizedQuestion} className="py-3.5">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-[13px] font-semibold leading-snug text-slate-800">{gap.originalQuestion}</p>
-                  <span className={`flex-shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${priorityClasses[gap.status] || priorityClasses.candidate}`}>{gap.status || 'candidate'}</span>
+                  <div className="flex flex-shrink-0 flex-wrap justify-end gap-1.5">
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${priorityClasses[gap.status] || priorityClasses.candidate}`}>{gap.status || 'candidate'}</span>
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${recurrenceClasses[getRecurrenceStatus(gap)]}`}>{getRecurrenceStatus(gap)}</span>
+                  </div>
                 </div>
                 <p className="mt-1.5 text-[11px] text-slate-400">{gap.occurrenceCount || 1} occurrence{gap.occurrenceCount === 1 ? '' : 's'}</p>
+                <p className="mt-1 text-[11px] text-slate-400">First detected {formatDetectedDate(gap.firstDetectedAt)} · Last detected {formatDetectedDate(gap.lastDetectedAt)}</p>
               </div>
             ))}
             {!knowledgeGaps.length && <p className="py-6 text-[12px] text-slate-400">{knowledgeGapsError || 'No knowledge gaps detected yet.'}</p>}
