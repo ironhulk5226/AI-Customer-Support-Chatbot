@@ -1,5 +1,6 @@
 import express from 'express';
 import { normalizeInputForRag } from '../services/localTranslationService.js';
+import { recordKnowledgeGap } from '../services/knowledgeGapService.js';
 
 const router = express.Router();
 
@@ -83,6 +84,19 @@ router.post('/', async (req, res) => {
 
     const normalizedMessage = ragQuery.toLowerCase();
     const result = answers.find(({ matches }) => matches.some((term) => normalizedMessage.includes(term))) || defaultAnswer;
+
+    if (result === defaultAnswer) {
+        try {
+            await recordKnowledgeGap({
+                originalQuestion: message,
+                normalizedQuestion: ragQuery,
+                language: selectedLanguage,
+            });
+        } catch (error) {
+            console.error('Knowledge gap could not be recorded:', error.message);
+        }
+    }
+
     const answer = getLocalizedAnswer(result, selectedLanguage);
 
     return res.json({

@@ -54,4 +54,9 @@ export async function saveConversation(payload) {
     return response.data
 }
 
+export async function getKnowledgeGaps() {
+    const response = await api.get('/api/knowledge-gaps')
+    return response.data.knowledgeGaps || []
+}
+
 export default api;

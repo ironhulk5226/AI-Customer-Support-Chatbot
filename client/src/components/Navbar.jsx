@@ -42,7 +42,7 @@ export default function Navbar({ language, onLanguageChange }) {
         <span className="flex items-baseline gap-1"><strong className="text-[18px] tracking-tight text-slate-900">SupportAI</strong><i className="h-1.5 w-1.5 rounded-full bg-gradient-to-r from-violet-500 to-cyan-400" /></span>
       </a>
       <div className="flex items-center gap-3 sm:gap-6">
-        <nav className="hidden items-center gap-6 text-[14px] font-medium text-slate-600 sm:flex"><a href="#features">{labels.features}</a><a href="#how-it-works">{labels.howItWorks}</a><a href="#trust">{labels.trust}</a><a href="#history">{labels.history}</a></nav>
+        <nav className="hidden items-center gap-6 text-[14px] font-medium text-slate-600 sm:flex"><a href="#features">{labels.features}</a><a href="#how-it-works">{labels.howItWorks}</a><a href="#trust">{labels.trust}</a><a href="#history">{labels.history}</a><a className="text-indigo-600 hover:text-indigo-800" href="/admin">Admin</a></nav>
         <span className="hidden h-4 w-px bg-indigo-100 sm:block" />
         <div className="relative">
           <button className="flex items-center gap-1.5 rounded-full border border-indigo-100 bg-white/90 px-3 py-1.5 text-[13px] font-medium text-slate-700 shadow-sm" onClick={() => setOpen(!open)}><span className="text-slate-500">{labels.language}</span><span className="text-slate-800">{currentLabel}</span><Icon name="chevron" size={14} className="text-slate-400" /></button>

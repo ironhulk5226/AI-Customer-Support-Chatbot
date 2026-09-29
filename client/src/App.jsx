@@ -6,9 +6,25 @@ import Hero from './components/Hero'
 import HowItWorks from './components/HowItWorks'
 import Navbar from './components/Navbar'
 import TrustSection from './components/TrustSection'
+import AdminDashboard from './pages/AdminDashboard'
 
 function App() {
   const [language, setLanguage] = useState('en')
+
+  if (window.location.pathname === '/admin') {
+    return (
+      <div className="app-shell min-h-screen overflow-x-hidden text-slate-800">
+        <div className="ambient-layer" aria-hidden="true">
+          <div className="ambient-glow ambient-glow-one" />
+          <div className="ambient-glow ambient-glow-two" />
+          <div className="ambient-glow ambient-glow-three" />
+          <div className="dot-grid" />
+        </div>
+        <Navbar language={language} onLanguageChange={setLanguage} />
+        <AdminDashboard />
+      </div>
+    )
+  }
 
   return (
     <div className="app-shell min-h-screen overflow-x-hidden text-slate-800">

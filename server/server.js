@@ -8,6 +8,7 @@ import feedbackRoutes from "./routes/feedbackRoutes.js";
 import conversationRoutes from "./routes/conversationRoutes.js";
 import translationRoutes from "./routes/translationRoutes.js";
 import speechRoutes from "./routes/speechRoutes.js";
+import knowledgeGapRoutes from "./routes/knowledgeGapRoutes.js";
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use("/api/speech", express.raw({
     type: ['audio/webm', 'audio/ogg', 'audio/wav', 'audio/mpeg', 'audio/mp4'],
     limit: '25mb',
 }), speechRoutes);
+app.use("/api/knowledge-gaps", knowledgeGapRoutes);
 
 connectDB();
 
