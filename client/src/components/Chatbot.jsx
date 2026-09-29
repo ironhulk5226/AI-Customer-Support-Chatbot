@@ -412,7 +412,8 @@ export default function Chatbot({ language, onLanguageChange }) {
     setVoiceState('processing')
 
     try {
-      const result = await transcribeAudio(audioBlob)
+      const selectedLanguage = ['en', 'hi', 'mr'].includes(language) ? language : 'en'
+      const result = await transcribeAudio(audioBlob, selectedLanguage)
       const recognizedText = typeof result.text === 'string' ? result.text.trim() : ''
 
       if (!recognizedText) throw new Error('No speech was recognized')

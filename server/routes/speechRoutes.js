@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const router = express.Router();
 const workerPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'services', 'speechWorker.py');
+const supportedLanguages = new Set(['en', 'hi', 'mr']);
 const mimeExtensions = {
   'audio/webm': '.webm',
   'audio/ogg': '.ogg',
@@ -15,35 +16,69 @@ const mimeExtensions = {
   'audio/mp4': '.mp4',
 };
 
-const runLocalRecognizer = (audioPath) => new Promise((resolve, reject) => {
+let recognizerProcess = null;
+let recognizerBuffer = '';
+const recognizerQueue = [];
+
+const rejectRecognizerQueue = (error) => {
+  while (recognizerQueue.length) recognizerQueue.shift().reject(error);
+};
+
+const startRecognizer = () => {
+  if (recognizerProcess) return recognizerProcess;
+
   const pythonCommand = process.env.WHISPER_PYTHON || 'python';
-  const worker = spawn(pythonCommand, [workerPath, audioPath], {
+  recognizerProcess = spawn(pythonCommand, [workerPath, '--persistent'], {
     env: process.env,
     windowsHide: true,
   });
-  let output = '';
-  let errorOutput = '';
 
-  worker.stdout.on('data', (chunk) => { output += chunk.toString(); });
-  worker.stderr.on('data', (chunk) => { errorOutput += chunk.toString(); });
-  worker.on('error', reject);
-  worker.on('close', (code) => {
-    if (code !== 0) {
-      reject(new Error(errorOutput.trim() || 'Local speech recognizer failed.'));
-      return;
-    }
+  recognizerProcess.stdout.on('data', (chunk) => {
+    recognizerBuffer += chunk.toString();
+    const lines = recognizerBuffer.split(/\r?\n/);
+    recognizerBuffer = lines.pop() || '';
 
-    try {
-      resolve(JSON.parse(output));
-    } catch {
-      reject(new Error('Local speech recognizer returned an invalid response.'));
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const request = recognizerQueue.shift();
+      if (!request) continue;
+
+      try {
+        const result = JSON.parse(line);
+        if (result.error) request.reject(new Error(result.error));
+        else request.resolve(result);
+      } catch {
+        request.reject(new Error('Local speech recognizer returned an invalid response.'));
+      }
     }
   });
+  recognizerProcess.on('error', (error) => {
+    recognizerProcess = null;
+    rejectRecognizerQueue(error);
+  });
+  recognizerProcess.on('close', (code) => {
+    recognizerProcess = null;
+    recognizerBuffer = '';
+    if (code !== 0) rejectRecognizerQueue(new Error('Local speech recognizer stopped unexpectedly.'));
+  });
+
+  return recognizerProcess;
+};
+
+const runLocalRecognizer = (audioPath, language) => new Promise((resolve, reject) => {
+  const worker = startRecognizer();
+  recognizerQueue.push({ resolve, reject });
+  worker.stdin.write(`${JSON.stringify({ audio_path: audioPath, language })}\n`);
 });
 
 router.post('/', async (req, res) => {
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
     return res.status(400).json({ message: 'Audio input is required.' });
+  }
+
+  const language = typeof req.query.language === 'string' ? req.query.language.trim().toLowerCase() : '';
+  if (!supportedLanguages.has(language)) {
+    return res.status(400).json({ message: 'A supported speech language is required.' });
   }
 
   const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'support-speech-'));
@@ -52,7 +87,7 @@ router.post('/', async (req, res) => {
 
   try {
     await fs.writeFile(audioPath, req.body);
-    const result = await runLocalRecognizer(audioPath);
+    const result = await runLocalRecognizer(audioPath, language);
     return res.json({ text: result.text || '', language: result.language || null });
   } catch (error) {
     console.error('Local speech recognition failed:', error.message);

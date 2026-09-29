@@ -1,4 +1,5 @@
 import express from 'express';
+import { normalizeInputForRag } from '../services/localTranslationService.js';
 
 const router = express.Router();
 
@@ -64,7 +65,7 @@ const getLocalizedAnswer = (result, language) => {
     return localizedAnswerMap[language]?.[key] || localizedAnswerMap.en[key] || result.answer;
 };
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
     const selectedLanguage = getAllowedLanguage(typeof req.body?.language === 'string' ? req.body.language.trim().toLowerCase() : 'en');
 
@@ -72,7 +73,15 @@ router.post('/', (req, res) => {
         return res.status(400).json({ message: 'A message is required.' });
     }
 
-    const normalizedMessage = message.toLowerCase();
+    let ragQuery;
+    try {
+        ragQuery = await normalizeInputForRag(message, selectedLanguage);
+    } catch (error) {
+        console.error('Local input translation failed:', error.message);
+        return res.status(503).json({ message: 'Local input translation is unavailable.' });
+    }
+
+    const normalizedMessage = ragQuery.toLowerCase();
     const result = answers.find(({ matches }) => matches.some((term) => normalizedMessage.includes(term))) || defaultAnswer;
     const answer = getLocalizedAnswer(result, selectedLanguage);
 

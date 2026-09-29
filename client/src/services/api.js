@@ -13,8 +13,9 @@ export async function sendMessage(message, language = 'en') {
     return response.data
 }
 
-export async function transcribeAudio(audioBlob) {
+export async function transcribeAudio(audioBlob, language = 'en') {
     const response = await api.post('/api/speech', audioBlob, {
+        params: { language },
         headers: {
             'Content-Type': audioBlob.type || 'audio/webm',
         },
