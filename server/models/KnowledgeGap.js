@@ -12,6 +12,10 @@ const knowledgeGapSchema = new mongoose.Schema({
     trim: true,
     index: true,
   },
+  questionHistory: {
+    type: [String],
+    default: [],
+  },
   language: {
     type: String,
     enum: ['en', 'hi', 'mr'],

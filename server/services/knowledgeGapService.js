@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import KnowledgeGap from '../models/KnowledgeGap.js';
+import { findSimilarKnowledgeGap } from './knowledgeGapGroupingService.js';
 
 const memoryKnowledgeGaps = [];
 
@@ -11,11 +12,12 @@ const normalizeGapPayload = (payload = {}) => ({
 
 const recordInMemory = ({ originalQuestion, normalizedQuestion, language }) => {
   const now = new Date();
-  const existing = memoryKnowledgeGaps.find((gap) => gap.normalizedQuestion === normalizedQuestion);
+  const existing = findSimilarKnowledgeGap(memoryKnowledgeGaps, normalizedQuestion);
 
   if (existing) {
     existing.occurrenceCount += 1;
     existing.lastDetectedAt = now;
+    existing.questionHistory.push(originalQuestion);
     return existing;
   }
 
@@ -28,6 +30,7 @@ const recordInMemory = ({ originalQuestion, normalizedQuestion, language }) => {
     status: 'candidate',
     firstDetectedAt: now,
     lastDetectedAt: now,
+    questionHistory: [originalQuestion],
   };
 
   memoryKnowledgeGaps.push(gap);
@@ -44,17 +47,20 @@ export const recordKnowledgeGap = async (payload) => {
     return recordInMemory(normalized);
   }
 
-  const existing = await KnowledgeGap.findOne({ normalizedQuestion: normalized.normalizedQuestion });
+  const existingGaps = await KnowledgeGap.find({});
+  const existing = findSimilarKnowledgeGap(existingGaps, normalized.normalizedQuestion);
   if (!existing) {
     return KnowledgeGap.create({
       ...normalized,
       occurrenceCount: 1,
       status: 'candidate',
+      questionHistory: [normalized.originalQuestion],
     });
   }
 
   existing.occurrenceCount += 1;
   existing.lastDetectedAt = new Date();
+  existing.questionHistory = [...(existing.questionHistory || []), normalized.originalQuestion];
   await existing.save();
   return existing;
 };
