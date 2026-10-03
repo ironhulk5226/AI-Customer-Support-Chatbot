@@ -27,8 +27,8 @@ function AdminLogin() {
                 return;
             }
 
-            localStorage.setItem("token", response.data.token);
-            localStorage.setItem(
+            sessionStorage.setItem("token", response.data.token);
+            sessionStorage.setItem(
                 "user",
                 JSON.stringify(response.data.user)
             );

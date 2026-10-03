@@ -20,3 +20,19 @@ Thumbs.db
 server/uploads/
 server/chroma-data/
 notes/
+
+# ChromaDB local data
+chroma-data/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Python virtual environments
+.venv/
+venv/
+server/.venv-translation/
+server/.venv-speech/
+
+# Generated project structure
+server/project-structure.txt

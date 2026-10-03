@@ -1,8 +1,8 @@
 import { Navigate, Outlet } from "react-router-dom";
 
 function AdminRoute() {
-    const token = localStorage.getItem("token");
-    const user = JSON.parse(localStorage.getItem("user"));
+    const token = sessionStorage.getItem("token");
+    const user = JSON.parse(sessionStorage.getItem("user"));
 
     if (!token) {
         return <Navigate to="/login" replace />;
