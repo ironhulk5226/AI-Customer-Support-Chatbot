@@ -12,6 +12,7 @@ import feedbackRoutes from "./routes/feedbackRoutes.js";
 import knowledgeGapRoutes from "./routes/knowledgeGapRoutes.js";
 import speechRoutes from "./routes/speechRoutes.js";
 import faqRoutes from "./routes/faqRoutes.js";
+import analyticsRoutes from "./routes/analyticsRoutes.js";
 
 
 dotenv.config();
@@ -47,6 +48,7 @@ app.use(
 app.use("/api/documents",documentRoutes);
 app.use("/api/vector-store",vectorStoreRoutes);
 app.use("/api/faqs", faqRoutes);
+app.use("/api/admin/analytics", analyticsRoutes);
 
 connectDB();
 

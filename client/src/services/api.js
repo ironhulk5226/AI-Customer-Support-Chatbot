@@ -268,6 +268,11 @@ export async function getKnowledgeGaps(status) {
   return response.data.knowledgeGaps || [];
 }
 
+export async function getAdminAnalytics() {
+  const response = await api.get("/api/admin/analytics");
+  return response.data;
+}
+
 export async function getDocuments() {
     const response = await api.get("/api/documents");
     return response.data.documents || response.data || [];
