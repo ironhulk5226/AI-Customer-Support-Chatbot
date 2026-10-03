@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 import ManageFAQs from "./pages/ManageFAQs";
 import ApprovedFAQs from "./pages/ApprovedFAQs";
+import ConversationHistory from "./pages/ConversationHistory";
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
       {/* Customer protected routes */}
       <Route element={<ProtectedRoute />}>
         <Route path="/customer" element={<CustomerHome />} />
+        <Route path="/customer/history" element={<ConversationHistory />} />
       </Route>
 
       {/* Admin protected routes */}

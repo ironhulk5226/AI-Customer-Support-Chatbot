@@ -27,8 +27,14 @@ body {
 }
 
 button,
-a {
+a,
+select {
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+}
+
+button:disabled {
+    cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {

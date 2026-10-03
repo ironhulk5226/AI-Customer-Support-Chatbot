@@ -173,9 +173,30 @@ const defaultAnswer = {
 }
 */
 
-function UserMessage({ text, language = "en" }) {
-  const timeLabel =
-    language === "hi" ? "अभी" : language === "mr" ? "आता" : "Just now";
+const formatMessageTime = (timestamp, language = "en") => {
+  if (!timestamp) {
+    return language === "hi" ? "अभी" : language === "mr" ? "आता" : "Just now";
+  }
+
+  const date = new Date(timestamp);
+
+  if (Number.isNaN(date.getTime())) {
+    return language === "hi" ? "अभी" : language === "mr" ? "आता" : "Just now";
+  }
+
+  return new Intl.DateTimeFormat(
+    language === "hi" ? "hi-IN" : language === "mr" ? "mr-IN" : "en-US",
+    {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    },
+  ).format(date);
+};
+
+function UserMessage({ text, timestamp, language = "en" }) {
+  const timeLabel = formatMessageTime(timestamp, language);
 
   return (
     <div className="message-in flex max-w-[85%] items-start justify-end gap-2.5 self-end">
@@ -189,8 +210,8 @@ function UserMessage({ text, language = "en" }) {
         </span>
       </div>
 
-      <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-violet-600 text-xs font-bold text-white ring-2 ring-indigo-200">
-        R
+      <div className="mt-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-indigo-500 to-violet-600 text-white shadow-sm ring-2 ring-indigo-200">
+        <Icon name="user" size={15} />
       </div>
     </div>
   );
@@ -241,6 +262,9 @@ function AssistantMessage({
         )}
 
         <div className="flex items-center justify-between px-1 text-[12px] text-slate-400">
+          <span className="font-mono text-[11px]">
+            {formatMessageTime(answer.timestamp, language)}
+          </span>
           <div className="flex items-center gap-2">
             <span>
               {language === "hi"
@@ -306,7 +330,11 @@ function AssistantMessage({
   );
 }
 
-export default function Chatbot({ language, onLanguageChange }) {
+export default function Chatbot({
+  language,
+  onLanguageChange,
+  initialConversationId = null,
+}) {
   /*
    * REAL CHAT STATE
    *
@@ -546,6 +574,7 @@ export default function Chatbot({ language, onLanguageChange }) {
       type: "user",
       text: question,
       language: normalizedLanguage,
+      timestamp: new Date().toISOString(),
     };
 
     const assistantId = createMessageId("assistant");
@@ -561,6 +590,7 @@ export default function Chatbot({ language, onLanguageChange }) {
         evidence: "",
         sources: [],
         feedback: null,
+        timestamp: new Date().toISOString(),
       },
     };
 
@@ -808,7 +838,9 @@ export default function Chatbot({ language, onLanguageChange }) {
             type: "user",
             text: serializeMessageText(message.content),
             language: message.language || "en",
+            timestamp: message.timestamp || null,
           };
+
         }
 
         const mergedSources = normalizeSources(message.sources || []);
@@ -825,6 +857,7 @@ export default function Chatbot({ language, onLanguageChange }) {
             evidence: mergedSources[0]?.evidence || "",
             sources: mergedSources,
             feedback: message.feedback || null,
+            timestamp: message.timestamp || null,
           },
         };
       });
@@ -847,6 +880,12 @@ export default function Chatbot({ language, onLanguageChange }) {
       );
     }
   };
+
+  useEffect(() => {
+    if (initialConversationId) {
+      loadConversation(initialConversationId);
+    }
+  }, [initialConversationId]);
 
   const transcribeRecording = async (audioBlob) => {
     setVoiceState("processing");
@@ -953,7 +992,7 @@ export default function Chatbot({ language, onLanguageChange }) {
 
   return (
     <div className="relative group">
-      <div className="absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-500/20 via-violet-500/20 to-cyan-500/20 blur-xl transition-opacity group-hover:opacity-100" />
+      <div className="pointer-events-none absolute -inset-1.5 rounded-3xl bg-gradient-to-r from-indigo-500/20 via-violet-500/20 to-cyan-500/20 blur-xl transition-opacity group-hover:opacity-100" />
 
       <div className="relative flex overflow-hidden rounded-2xl border border-indigo-100/90 bg-white/95 shadow-2xl shadow-indigo-500/10 backdrop-blur-2xl">
         <div className="flex min-w-0 flex-1 flex-col">
@@ -975,13 +1014,7 @@ export default function Chatbot({ language, onLanguageChange }) {
               {labels.newConversation}
             </button>
 
-            <button
-              type="button"
-              className="text-xs font-medium text-slate-500 hover:text-slate-700"
-              onClick={loadConversationHistory}
-            >
-              {labels.refresh}
-            </button>
+            
           </div>
 
           <div className="flex items-center justify-between border-b border-indigo-100/70 bg-gradient-to-r from-slate-50/90 via-indigo-50/40 to-slate-50/90 px-5 py-3.5">
@@ -1050,6 +1083,7 @@ export default function Chatbot({ language, onLanguageChange }) {
                 <UserMessage
                   key={`${message.text}-${index}`}
                   text={message.text}
+                  timestamp={message.timestamp}
                   language={language}
                 />
               ) : message.answer?.text ? (
@@ -1086,7 +1120,11 @@ export default function Chatbot({ language, onLanguageChange }) {
             <div className="flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white p-2 shadow-sm">
               <button
                 type="button"
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-700 transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  voiceState === "recording"
+                    ? "bg-rose-500 text-white shadow-lg shadow-rose-500/30 hover:bg-rose-600"
+                    : "bg-indigo-50 text-indigo-700 hover:-translate-y-0.5 hover:bg-indigo-100 hover:shadow-md"
+                }`}
                 aria-label={
                   voiceState === "recording"
                     ? "Stop voice input"
@@ -1095,9 +1133,13 @@ export default function Chatbot({ language, onLanguageChange }) {
                 onClick={toggleVoice}
                 disabled={voiceState === "processing"}
               >
+                {voiceState === "recording" && (
+                  <span className="absolute inset-0 animate-ping rounded-xl bg-rose-400/40" />
+                )}
                 <Icon
-                  name={voiceState === "recording" ? "voice" : "mic"}
-                  size={18}
+                  name={voiceState === "recording" ? "recording" : "mic"}
+                  size={19}
+                  className="relative z-10"
                 />
               </button>
 
@@ -1118,7 +1160,7 @@ export default function Chatbot({ language, onLanguageChange }) {
                 type="button"
                 onClick={() => submit()}
                 disabled={loading}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/25 transition-all duration-200 hover:-translate-y-0.5 hover:scale-105 hover:from-indigo-500 hover:to-violet-500 hover:shadow-xl hover:shadow-indigo-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
                 aria-label="Send message"
               >
                 <Icon name="arrow" size={16} />

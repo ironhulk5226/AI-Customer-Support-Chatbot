@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Icon from './Icon'
 
 const toneClasses = {
@@ -16,6 +18,10 @@ const labels = {
     untitled: 'Untitled conversation',
     started: 'Conversation started',
     today: 'Today',
+    previous: 'Previous page',
+    next: 'Next page',
+    page: 'Page',
+    backToRecent: 'Show recent',
   },
   hi: {
     error: 'हाल ही की बातचीत लोड नहीं हो सकी। आप अभी भी चैटिंग जारी रख सकते हैं।',
@@ -26,6 +32,10 @@ const labels = {
     untitled: 'बिना शीर्षक बातचीत',
     started: 'बातचीत शुरू हुई',
     today: 'आज',
+    previous: 'पिछला पृष्ठ',
+    next: 'अगला पृष्ठ',
+    page: 'पृष्ठ',
+    backToRecent: 'हाल की बातचीत',
   },
   mr: {
     error: 'अलीकडील संभाषणे आता लोड झाली नाहीत. तुम्ही अजूनही चॅटिंग सुरू ठेवू शकता.',
@@ -36,6 +46,10 @@ const labels = {
     untitled: 'शीर्षक नसलेली संभाषण',
     started: 'संभाषण सुरू झाले',
     today: 'आज',
+    previous: 'मागील पृष्ठ',
+    next: 'पुढील पृष्ठ',
+    page: 'पृष्ठ',
+    backToRecent: 'अलीकडील संभाषणे',
   },
 }
 
@@ -55,6 +69,23 @@ const formatConversationTime = (value, language = 'en') => {
 
 export default function RecentConversations({ conversations = [], onSelectConversation = () => {}, error = '', language = 'en' }) {
   const text = labels[language] || labels.en
+  const navigate = useNavigate()
+  const pageSize = 10
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageCount = Math.max(1, Math.ceil(conversations.length / pageSize))
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, pageCount))
+  }, [pageCount])
+
+  const visibleConversations = conversations.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  )
+
+  const handleSelectConversation = (conversationId) => {
+    onSelectConversation(conversationId)
+  }
 
   if (error) {
     return (
@@ -76,7 +107,14 @@ export default function RecentConversations({ conversations = [], onSelectConver
             <h2 className="text-xl font-bold tracking-tight text-slate-900">{text.heading}</h2>
             <p className="text-xs text-slate-500">{text.subtitle}</p>
           </div>
-          <a className="flex items-center gap-1 text-[13px] font-semibold text-indigo-600" href="#top">{text.viewHistory} <Icon name="arrow" size={16} /></a>
+          <button
+            type="button"
+            onClick={() => navigate('/customer/history')}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-semibold text-indigo-600 transition hover:bg-indigo-50 hover:text-indigo-700"
+          >
+            {text.viewHistory}
+            <Icon name="arrow" size={16} />
+          </button>
         </div>
 
         {conversations.length === 0 ? (
@@ -85,7 +123,7 @@ export default function RecentConversations({ conversations = [], onSelectConver
           </div>
         ) : (
           <div className="space-y-2.5">
-            {conversations.map((conversation, index) => {
+            {visibleConversations.map((conversation, index) => {
               const title = conversation.title || text.untitled
               const preview = conversation.messages?.find((message) => message.role === 'user')?.content || text.started
               const tone = ['violet', 'cyan', 'indigo'][index % 3]
@@ -94,7 +132,7 @@ export default function RecentConversations({ conversations = [], onSelectConver
                 <button
                   className="group flex w-full flex-col justify-between gap-2 rounded-xl border border-indigo-100/80 bg-white/80 p-3.5 text-left text-[13px] backdrop-blur-sm transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md sm:flex-row sm:items-center"
                   key={conversation._id || conversation.id || title}
-                  onClick={() => onSelectConversation(conversation._id || conversation.id)}
+                  onClick={() => handleSelectConversation(conversation._id || conversation.id)}
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     <span className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${toneClasses[tone] || toneClasses.indigo}`}>
@@ -113,6 +151,34 @@ export default function RecentConversations({ conversations = [], onSelectConver
                 </button>
               )
             })}
+          </div>
+        )}
+
+        {pageCount > 1 && (
+          <div className="mt-5 flex items-center justify-between rounded-xl border border-indigo-100/80 bg-white/60 px-3 py-2.5 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={currentPage === 1}
+              aria-label={text.previous}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <span aria-hidden="true" className="text-lg leading-none">‹</span>
+            </button>
+
+            <span className="text-xs font-semibold text-slate-500">
+              {text.page} {currentPage} / {pageCount}
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setCurrentPage((page) => Math.min(pageCount, page + 1))}
+              disabled={currentPage === pageCount}
+              aria-label={text.next}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 text-indigo-600 transition hover:border-indigo-300 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <span aria-hidden="true" className="text-lg leading-none">›</span>
+            </button>
           </div>
         )}
       </div>

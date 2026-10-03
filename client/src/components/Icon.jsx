@@ -11,9 +11,11 @@ const paths = {
   more: <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>,
   plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
   search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></>,
+  user: <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>,
   spark: <path d="m12 3 1.4 5.6L19 10l-5.6 1.4L12 17l-1.4-5.6L5 10l5.6-1.4L12 3ZM19 17l.5 2.5L22 20l-2.5.5L19 23l-.5-2.5L16 20l2.5-.5L19 17Z" />,
   robot: <><rect x="5" y="7" width="14" height="12" rx="3" /><path d="M12 3v4M8 12h.01M16 12h.01M9 16h6" /></>,
   shield: <path d="M12 3 19 6v5c0 4.5-3 8-7 10-4-2-7-5-7-10V6l7-3Z" />,
+  recording: <><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6" /><circle cx="12" cy="9" r="1.2" fill="currentColor" stroke="none" /></>,
   voice: <><path d="M4 12a8 8 0 0 0 16 0M7 12a5 5 0 0 0 10 0M10 12a2 2 0 0 0 4 0" /><path d="M12 4v4M12 16v4" /></>,
 }
 
